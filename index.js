@@ -4,6 +4,8 @@ const port = 3000
 const path = require('path')
 const fetch = require('node-fetch')
 const bp = require('body-parser')
+const { resolve } = require('path/posix')
+const res = require('express/lib/response')
 
 // view engine
 app.set('view engine', 'ejs')
@@ -15,42 +17,44 @@ app.use(bp.urlencoded({ extended: true }))
 
 // weather key and city
 const key = '09c55a9a2af84d1398ebb65835dd5b72'
-let city = 'Tartu'
 
-// get weather data for Tartu
-app.get('/', function (req, res) {
-    fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${key}`)
-    .then((responce) => {
-        return responce.json()
-    })
-    .then((data) => {
-        let description = data.weather[0].description
-        let city = data.name
-        let temp = Math.round(parseFloat(data.main.temp) - 273.15)
-        res.render('index', {
-            description: description,
-            city: city,
-            temp: temp
+// get weather data
+const getWeatherDataPromise = (url) => {
+    return new Promise((resolve, reject) => {
+        fetch(url)
+        .then((responce) => {
+            return responce.json()
+        })
+        .then((data) => {
+            let description = data.weather[0].description
+            let city = data.name
+            let temp = Math.round(parseFloat(data.main.temp) - 273.15)
+            let result = {
+                description: description,
+                city: city,
+                temp: temp
+            }
+            resolve(result)
+        })
+        .catch(error => {
+            reject(error)
         })
     })
-})
+}
 
-// Change data to your liking
-app.post('/', function(req, res){
-    let city = req.body.cityname
-    fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${key}`)
-    .then((responce) => {
-        return responce.json()
-    })
-    .then((data) => {
-        let description = data.weather[0].description
-        let city = data.name
-        let temp = Math.round(parseFloat(data.main.temp) - 273.15)
-        res.render('index', {
-            description: description,
-            city: city,
-            temp: temp
-        })
+// weather data to UI
+app.all('/', function (req, res) {
+    let city
+    if(req.method == 'GET'){
+        city = 'Tartu'
+    }
+    if(req.method == 'POST'){
+        city = req.body.cityname
+    }
+    let url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${key}`
+    getWeatherDataPromise(url)
+    .then(data => {
+        res.render('index', data)
     })
 })
 
